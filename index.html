@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LUCKY ROULETTE</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="stage">
+    <h1 class="title">LUCKY ROULETTE</h1>
+
+    <div class="wheel-wrap">
+      <svg id="roulette" viewBox="0 0 500 500" aria-label="룰렛">
+        <defs>
+          <radialGradient id="rimGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="86%" stop-color="#8a6212"/>
+            <stop offset="92%" stop-color="#f7d774"/>
+            <stop offset="97%" stop-color="#b8861b"/>
+            <stop offset="100%" stop-color="#5c3f07"/>
+          </radialGradient>
+          <radialGradient id="hubGrad" cx="40%" cy="35%" r="70%">
+            <stop offset="0%" stop-color="#fff2b8"/>
+            <stop offset="45%" stop-color="#e2b33c"/>
+            <stop offset="100%" stop-color="#7a5508"/>
+          </radialGradient>
+          <radialGradient id="shade" cx="50%" cy="50%" r="50%">
+            <stop offset="60%" stop-color="#000" stop-opacity="0"/>
+            <stop offset="100%" stop-color="#000" stop-opacity="0.35"/>
+          </radialGradient>
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2.5" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="pointerShadow" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000" flood-opacity="0.7"/>
+          </filter>
+        </defs>
+
+        <!-- 금색 테두리 -->
+        <circle cx="250" cy="250" r="244" fill="url(#rimGrad)"/>
+        <circle cx="250" cy="250" r="244" fill="none" stroke="#3d2a04" stroke-width="2"/>
+        <g id="bulbs"></g>
+
+        <!-- 회전하는 휠 -->
+        <g id="wheel">
+          <g id="segments"></g>
+        </g>
+        <circle cx="250" cy="250" r="212" fill="url(#shade)" pointer-events="none"/>
+        <circle cx="250" cy="250" r="212" fill="none" stroke="#f7d774" stroke-width="3" pointer-events="none"/>
+
+        <!-- 중앙 허브 -->
+        <circle cx="250" cy="250" r="34" fill="url(#hubGrad)" stroke="#5c3f07" stroke-width="3"/>
+        <circle cx="250" cy="250" r="12" fill="#5c3f07"/>
+
+        <!-- 고정 포인터 -->
+        <polygon id="pointer" points="226,4 274,4 250,62" fill="#e01b24"
+                 stroke="#fff" stroke-width="3" stroke-linejoin="round" filter="url(#pointerShadow)"/>
+      </svg>
+    </div>
+
+    <div class="result" id="result">결과: <span id="resultNum">?</span></div>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
