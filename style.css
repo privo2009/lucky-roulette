@@ -149,9 +149,12 @@ button, input, select { font-family: inherit; }
 
 .cols, .row {
   display: grid;
-  grid-template-columns: 15% 15% 26% 22% 22%;
+  grid-template-columns: 13% 12% 32% 23% 20%;
   align-items: center;
 }
+[data-phase="spin"] .cols, [data-phase="spin"] .row,
+[data-phase="result"] .cols, [data-phase="result"] .row,
+[data-phase="end"] .cols, [data-phase="end"] .row { grid-template-columns: 11% 11% 36% 23% 19%; }
 .cols {
   font-size: 2vh;
   color: rgba(255, 246, 201, 0.6);
@@ -203,15 +206,51 @@ button, input, select { font-family: inherit; }
 }
 .held { display: block; font-size: calc(1.6vh * var(--s)); color: rgba(255, 246, 201, 0.7); margin-top: 0.3vh; }
 
-.c-bet, .c-save { display: flex; align-items: center; flex-wrap: wrap; gap: 0.3vh 0.5vw; }
-.c-save { flex-direction: column; align-items: flex-start; justify-content: center; }
-.bet-num {
-  font-size: calc(3.6vh * var(--s)); font-weight: 900; color: #fff;
-  background: #b3121f; border-radius: 0.8vh; padding: 0 0.6vw;
+.c-act { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 0.6vh; padding-right: 0.6vw; }
+[data-phase="spin"] .c-act, [data-phase="result"] .c-act, [data-phase="end"] .c-act { flex-direction: row; align-items: center; }
+.c-save { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 0.3vh; }
+
+/* 베팅 / 적금 / 쉬기 토글 */
+.mode-tabs {
+  display: inline-flex;
+  flex-shrink: 0;
+  border: 0.2vh solid var(--gold-dark);
+  border-radius: 1vh;
+  overflow: hidden;
 }
-.bet-amt { font-size: calc(3.2vh * var(--s)); font-weight: 800; }
+.mode-btn {
+  font-size: calc(2.3vh * var(--s));
+  font-weight: 800;
+  padding: 0 0.7vw;
+  height: calc(4.4vh * var(--s));
+  border: none;
+  border-left: 0.15vh solid rgba(184, 134, 27, 0.6);
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 246, 201, 0.55);
+  cursor: pointer;
+}
+.mode-btn:first-child { border-left: none; }
+.mode-btn:hover:not(.active) { color: var(--cream); background: rgba(247, 215, 116, 0.12); }
+.mode-btn.active { color: #fff; }
+.mode-btn.mode-bet.active  { background: #b3121f; }
+.mode-btn.mode-save.active { background: #1f8a4c; }
+.mode-btn.mode-rest.active { background: #5a5560; }
+.mode-inputs { display: flex; align-items: center; gap: 0.5vw; min-width: 0; }
+.mode-inputs .muted { white-space: nowrap; }
+
+/* 진행/결과 단계의 "이번 라운드" 표시 */
+.act {
+  font-size: calc(2.6vh * var(--s));
+  font-weight: 900;
+  border-radius: 1vh;
+  padding: 0.4vh 0.8vw;
+  white-space: nowrap;
+}
+.act-bet  { background: rgba(179, 18, 31, 0.85); color: #fff; }
+.act-save { background: rgba(31, 138, 76, 0.75); color: #fff; }
+.act-rest { color: rgba(255, 246, 201, 0.5); }
 .muted { font-size: calc(2.4vh * var(--s)); color: rgba(255, 246, 201, 0.45); }
-.save-main { font-size: calc(2.8vh * var(--s)); font-weight: 800; }
+.save-main { font-size: calc(2.5vh * var(--s)); font-weight: 800; white-space: nowrap; }
 .save-main.good { color: var(--good); }
 .save-sub, .save-status { font-size: calc(1.7vh * var(--s)); color: rgba(255, 246, 201, 0.75); }
 .bad { color: #ff9a9d !important; }
@@ -240,7 +279,7 @@ button, input, select { font-family: inherit; }
 .in-num { width: 5.4vw; }
 .in-amt { width: 6vw; text-align: right; }
 .in-amt::placeholder { color: rgba(255, 246, 201, 0.35); font-weight: 400; }
-.in-save { width: 7.5vw; }
+.in-save { width: 7vw; }
 .row select:focus, .row input:focus { outline: none; border-color: #fff; box-shadow: 0 0 1vh rgba(247, 215, 116, 0.7); }
 .unit { font-size: calc(2vh * var(--s)); }
 

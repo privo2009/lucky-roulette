@@ -30,8 +30,40 @@
     return { phase: 'setup', settings: settings || defaultSettings(), rotation: 0 };
   }
 
+  var MODES = ['bet', 'save', 'rest'];
+
+  /** 새 라운드 기본 선택: 적금 진행 중이면 "적금"(같은 금액), 아니면 "쉬기" */
   function emptyBet(team) {
-    return { num: 0, amount: 0, saving: team && team.plan ? team.plan.amount : 0 };
+    return team && team.plan
+      ? { mode: 'save', num: 0, amount: 0, saving: team.plan.amount }
+      : { mode: 'rest', num: 0, amount: 0, saving: 0 };
+  }
+
+  /** 선택한 모드 외의 값은 0으로 지움 → 베팅과 적금이 동시에 존재할 수 없음 */
+  function cleanBet(bet) {
+    var mode = bet.mode;
+    if (MODES.indexOf(mode) < 0) {
+      // 예전 버전 저장 데이터 호환
+      mode = bet.amount > 0 ? 'bet' : bet.saving > 0 ? 'save' : 'rest';
+    }
+    return {
+      mode: mode,
+      num: mode === 'bet' ? (bet.num || 0) : 0,
+      amount: mode === 'bet' ? (bet.amount || 0) : 0,
+      saving: mode === 'save' ? (bet.saving || 0) : 0
+    };
+  }
+
+  /** 모드 전환. 적금 모드로 바꾸면 진행 중 적금 금액을 자동으로 채움 */
+  function setMode(team, mode) {
+    team.bet = cleanBet({ mode: mode, num: 0, amount: 0,
+                          saving: mode === 'save' && team.plan ? team.plan.amount : 0 });
+    return team.bet;
+  }
+
+  function normalizeState(state) {
+    if (state && state.teams) state.teams.forEach(function (t) { if (t.bet) t.bet = cleanBet(t.bet); });
+    return state;
   }
 
   function newGame(settings, rotation) {
@@ -58,11 +90,21 @@
   /** 모둠 한 곳의 베팅 입력 검사. 오류 메시지 또는 '' 반환 */
   function validateBet(team) {
     var b = team.bet;
-    if (!isInt(b.amount) || b.amount < 0) return '베팅 금액 오류';
-    if (b.saving !== 0 && SAVING_OPTIONS.indexOf(b.saving) < 0) return '적금은 3~6만 가능';
-    if (b.amount > 0 && !(b.num >= 1 && b.num <= 8)) return '번호를 고르세요';
-    if (b.amount + b.saving > team.coins) return '코인 부족';
-    return '';
+    if (b.mode === 'rest') return '';
+    if (b.mode === 'bet') {
+      if (b.saving) return '베팅/적금 중 하나만';
+      if (!(b.num >= 1 && b.num <= 8)) return '번호 선택';
+      if (!isInt(b.amount) || b.amount <= 0) return '금액 입력';
+      if (b.amount > team.coins) return '코인 부족';
+      return '';
+    }
+    if (b.mode === 'save') {
+      if (b.amount || b.num) return '베팅/적금 중 하나만';
+      if (SAVING_OPTIONS.indexOf(b.saving) < 0) return '적금액 선택';
+      if (b.saving > team.coins) return '코인 부족';
+      return '';
+    }
+    return '선택하세요';
   }
   function isInt(v) { return typeof v === 'number' && isFinite(v) && Math.floor(v) === v; }
 
@@ -72,13 +114,13 @@
 
   /** 이번 납입으로 적금이 깨지는지 (화면 경고용) */
   function savingWillBreak(team) {
-    return !!team.plan && team.bet.saving !== team.plan.amount;
+    return !!team.plan && (team.bet.mode !== 'save' || team.bet.saving !== team.plan.amount);
   }
 
   function closeBets(state) {
     var s = clone(state);
     s.phase = 'spin';
-    s.teams.forEach(function (t) { if (t.bet.amount === 0) t.bet.num = 0; });
+    s.teams.forEach(function (t) { t.bet = cleanBet(t.bet); });
     return s;
   }
 
@@ -89,9 +131,10 @@
     s.lastResult = result;
     s.teams.forEach(function (t) {
       var before = t.coins;
+      t.bet = cleanBet(t.bet);
       var bet = t.bet.amount, pay = t.bet.saving;
-      var r = { bet: bet, num: t.bet.num, saving: pay, win: false, gross: 0, fee: 0,
-                matured: 0, bonus: 0, brokenAmount: 0, delta: 0 };
+      var r = { mode: t.bet.mode, bet: bet, num: t.bet.num, saving: pay, savingCount: 0,
+                win: false, gross: 0, fee: 0, matured: 0, bonus: 0, brokenAmount: 0, delta: 0 };
 
       t.coins -= bet + pay;
 
@@ -118,6 +161,7 @@
           if (t.plan) { r.brokenAmount = t.plan.amount * t.plan.count; t.broken += r.brokenAmount; }
           t.plan = { amount: pay, count: 1 };
         }
+        r.savingCount = t.plan.count;
         if (t.plan.count >= SAVING_ROUNDS) {
           r.bonus = SAVING_BONUS[pay];
           r.matured = pay * SAVING_ROUNDS + r.bonus;
@@ -167,7 +211,7 @@
     return list;
   }
 
-  /** 매 라운드 amount씩 적금만 했을 때 최종 코인 */
+  /** 매 라운드 amount씩 적금만 했을 때 최종 코인 (적금 라운드에는 베팅 불가 → 베팅은 전혀 하지 않음) */
   function savingsOnlyFinal(startCoins, rounds, amount) {
     var coins = startCoins, count = 0, held = 0;
     for (var r = 1; r <= rounds; r++) {
@@ -203,6 +247,7 @@
     FEE_START_ROUND: FEE_START_ROUND, FEE_TABLE: FEE_TABLE, SAVING_BONUS: SAVING_BONUS,
     SAVING_OPTIONS: SAVING_OPTIONS, SAVING_ROUNDS: SAVING_ROUNDS,
     fee: fee, feeApplies: feeApplies, defaultSettings: defaultSettings, defaultName: defaultName,
+    MODES: MODES, emptyBet: emptyBet, cleanBet: cleanBet, setMode: setMode, normalizeState: normalizeState,
     initialState: initialState, newGame: newGame, validateBet: validateBet, allValid: allValid,
     savingWillBreak: savingWillBreak, closeBets: closeBets, settle: settle, nextRound: nextRound,
     returnedSavings: returnedSavings, standings: standings, savingsOnlyFinal: savingsOnlyFinal,

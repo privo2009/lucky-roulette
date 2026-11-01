@@ -26,6 +26,7 @@
     try { state = JSON.parse(localStorage.getItem(KEY)); } catch (e) { state = null; }
     try { history = JSON.parse(localStorage.getItem(HKEY)) || []; } catch (e) { history = []; }
     if (!state || !state.phase) { state = G.initialState(); history = []; }
+    G.normalizeState(state);
   }
   function save() {
     try {
@@ -42,7 +43,7 @@
   }
   function undo() {
     if (W.isSpinning() || !history.length) return;
-    state = JSON.parse(history.pop());
+    state = G.normalizeState(JSON.parse(history.pop()));
     save();
     W.setRotation(state.rotation || 0);
     render();
@@ -95,7 +96,7 @@
     $('feeBox').hidden = !feeOn;
     if (feeOn) renderFeeTable();
 
-    $('lastColLabel').textContent = p === 'bet' ? '확인' : p === 'spin' ? '' : '이번 라운드';
+    $('lastColLabel').textContent = p === 'bet' ? '확인' : p === 'spin' ? '' : '증감';
 
     var rows = $('rows');
     rows.innerHTML = '';
@@ -138,6 +139,24 @@
     return plan ? plan.amount + '코인 × ' + plan.count + '/' + G.SAVING_ROUNDS + '회' : '없음';
   }
 
+  var MODE_LABEL = { bet: '베팅', save: '적금', rest: '쉬기' };
+  var BREAK_MSG = '베팅하면 적금이 해지되고 보너스를 받을 수 없어요. 계속할까요?';
+
+  /** 진행/결과 화면용 "이번 라운드" 표시 */
+  function actionView(t, cell) {
+    var b = t.bet, r = t.last;
+    var mode = r ? r.mode : b.mode;
+    if (mode === 'bet') {
+      cell.appendChild(h('span', 'act act-bet', '🎲 ' + (r ? r.num : b.num) + '번 / ' + (r ? r.bet : b.amount) + '코인'));
+    } else if (mode === 'save') {
+      var amt = r ? r.saving : b.saving;
+      var cnt = r ? r.savingCount : (t.plan && t.plan.amount === amt ? t.plan.count + 1 : 1);
+      cell.appendChild(h('span', 'act act-save', '💰 적금 ' + amt + '코인 (' + cnt + '/' + G.SAVING_ROUNDS + '회)'));
+    } else {
+      cell.appendChild(h('span', 'act act-rest', '😴 쉬기'));
+    }
+  }
+
   function renderRow(t, i) {
     var p = state.phase;
     var row = h('div', 'row');
@@ -150,50 +169,19 @@
     if (t.broken > 0) coins.appendChild(h('small', 'held', '보관 적금 ' + t.broken));
     row.appendChild(coins);
 
-    var betCell = h('div', 'c-bet');
+    var actCell = h('div', 'c-act');
     var saveCell = h('div', 'c-save');
     var lastCell = h('div', 'c-last');
 
     if (p === 'bet') {
-      // 번호
-      var num = h('select', 'in-num');
-      num.appendChild(new Option('번호', '0'));
-      for (var k = 1; k <= 8; k++) num.appendChild(new Option(k + '번', String(k)));
-      num.value = String(t.bet.num || 0);
-      // 금액
-      var amt = h('input', 'in-amt');
-      amt.type = 'number'; amt.min = '0'; amt.step = '1'; amt.inputMode = 'numeric';
-      amt.placeholder = '금액';
-      amt.value = t.bet.amount ? String(t.bet.amount) : '';
-      betCell.appendChild(num);
-      betCell.appendChild(amt);
-      // 적금
-      var sav = h('select', 'in-save');
-      sav.appendChild(new Option('적금 X', '0'));
-      G.SAVING_OPTIONS.forEach(function (a) { sav.appendChild(new Option(a + '코인', String(a))); });
-      sav.value = String(t.bet.saving || 0);
-      saveCell.appendChild(sav);
+      buildBetInputs(t, row, actCell);
+      saveCell.appendChild(h('span', 'save-main', planText(t.plan)));
       saveCell.appendChild(h('small', 'save-status'));
-
-      num.addEventListener('change', function () { t.bet.num = parseInt(num.value, 10) || 0; onBetEdit(row, t); });
-      amt.addEventListener('input', function () {
-        var v = amt.value.trim();
-        t.bet.amount = v === '' ? 0 : Number(v);
-        onBetEdit(row, t);
-      });
-      sav.addEventListener('change', function () { t.bet.saving = parseInt(sav.value, 10) || 0; onBetEdit(row, t); });
     } else {
-      // 베팅 표시
-      if (t.bet.amount > 0) {
-        betCell.appendChild(h('span', 'bet-num', t.bet.num + '번'));
-        betCell.appendChild(h('span', 'bet-amt', t.bet.amount + '코인'));
-      } else {
-        betCell.appendChild(h('span', 'muted', '베팅 안 함'));
-      }
-      // 적금 표시
+      actionView(t, actCell);
       if (p === 'spin') {
         saveCell.appendChild(h('span', 'save-main', planText(t.plan)));
-        if (t.bet.saving > 0) saveCell.appendChild(h('small', 'save-sub', '이번 납입 ' + t.bet.saving));
+        if (G.savingWillBreak(t)) saveCell.appendChild(h('small', 'save-sub bad', '이번 라운드에 해지'));
       } else {
         var r = t.last || {};
         if (r.matured) {
@@ -202,28 +190,80 @@
         } else {
           saveCell.appendChild(h('span', 'save-main', planText(t.plan)));
         }
-        if (r.brokenAmount) saveCell.appendChild(h('small', 'save-sub bad', '적금 깨짐 (원금 ' + r.brokenAmount + ' 종료 시 반환)'));
+        if (r.brokenAmount) saveCell.appendChild(h('small', 'save-sub bad', '적금 해지 · 원금 ' + r.brokenAmount + ' 보관'));
       }
-      // 증감
       if ((p === 'result' || p === 'end') && t.last) {
         var d = t.last.delta;
         lastCell.appendChild(h('span', 'delta ' + (d > 0 ? 'up' : d < 0 ? 'down' : 'zero'), signed(d)));
         var note = [];
-        if (t.last.bet > 0) {
+        if (t.last.mode === 'bet') {
           if (t.last.win) note.push('당첨 +' + t.last.gross + (t.last.fee ? ' (수수료 −' + t.last.fee + ')' : ''));
           else note.push('낙첨 −' + t.last.bet);
+        } else if (t.last.mode === 'save') {
+          note.push('적금 납입 −' + t.last.saving);
         }
-        if (t.last.saving > 0) note.push('적금 −' + t.last.saving);
         note.forEach(function (x) { lastCell.appendChild(h('small', 'delta-note', x)); });
         if (t.last.win) row.classList.add('winner');
       }
     }
 
-    row.appendChild(betCell);
+    row.appendChild(actCell);
     row.appendChild(saveCell);
     row.appendChild(lastCell);
     if (p === 'bet') updateRowStatus(row, t);
     return row;
+  }
+
+  function buildBetInputs(t, row, cell) {
+    var tabs = h('div', 'mode-tabs');
+    G.MODES.forEach(function (m) {
+      var btn = h('button', 'mode-btn mode-' + m + (t.bet.mode === m ? ' active' : ''), MODE_LABEL[m]);
+      btn.type = 'button';
+      btn.addEventListener('click', function () {
+        btn.blur();
+        if (t.bet.mode === m) return;
+        if (m === 'bet' && t.plan && !window.confirm(BREAK_MSG)) return;
+        G.setMode(t, m);
+        var fresh = renderRow(t, Number(row.dataset.idx));
+        row.replaceWith(fresh);
+        save();
+        updateBetValidity();
+        var first = fresh.querySelector('.mode-inputs select, .mode-inputs input');
+        if (first && m === 'bet') first.focus();
+      });
+      tabs.appendChild(btn);
+    });
+    cell.appendChild(tabs);
+
+    var box = h('div', 'mode-inputs');
+    if (t.bet.mode === 'bet') {
+      var num = h('select', 'in-num');
+      num.appendChild(new Option('번호', '0'));
+      for (var k = 1; k <= 8; k++) num.appendChild(new Option(k + '번', String(k)));
+      num.value = String(t.bet.num || 0);
+      var amt = h('input', 'in-amt');
+      amt.type = 'number'; amt.min = '1'; amt.step = '1'; amt.inputMode = 'numeric';
+      amt.placeholder = '금액';
+      amt.value = t.bet.amount ? String(t.bet.amount) : '';
+      num.addEventListener('change', function () { t.bet.num = parseInt(num.value, 10) || 0; onBetEdit(row, t); });
+      amt.addEventListener('input', function () {
+        var v = amt.value.trim();
+        t.bet.amount = v === '' ? 0 : Number(v);
+        onBetEdit(row, t);
+      });
+      box.appendChild(num);
+      box.appendChild(amt);
+    } else if (t.bet.mode === 'save') {
+      var sav = h('select', 'in-save');
+      sav.appendChild(new Option('금액', '0'));
+      G.SAVING_OPTIONS.forEach(function (a) { sav.appendChild(new Option(a + '코인', String(a))); });
+      sav.value = String(t.bet.saving || 0);
+      sav.addEventListener('change', function () { t.bet.saving = parseInt(sav.value, 10) || 0; onBetEdit(row, t); });
+      box.appendChild(sav);
+    } else {
+      box.appendChild(h('span', 'muted', '이번 라운드 쉬기'));
+    }
+    cell.appendChild(box);
   }
 
   function onBetEdit(row, t) {
@@ -235,27 +275,26 @@
   function updateRowStatus(row, t) {
     var status = row.querySelector('.save-status');
     var last = row.querySelector('.c-last');
-    // 적금 상태
-    var txt = '현재 ' + planText(t.plan);
+    var b = t.bet;
     status.className = 'save-status';
+    var txt = '';
     if (t.plan && G.savingWillBreak(t)) {
-      txt = '⚠ ' + planText(t.plan) + ' → 깨짐';
+      txt = b.mode === 'save' ? '⚠ 금액 변경 → 해지' : b.mode === 'bet' ? '⚠ 베팅 → 해지' : '⚠ 쉬면 해지';
       status.classList.add('bad');
     } else if (t.plan) {
-      txt = planText(t.plan) + ' → ' + (t.plan.count + 1) + '회차';
-    } else if (t.bet.saving > 0) {
+      txt = t.plan.count + 1 >= G.SAVING_ROUNDS ? '→ 이번에 만기!' : '→ ' + (t.plan.count + 1) + '회차';
+    } else if (b.mode === 'save') {
       txt = '새 적금 시작';
     }
     status.textContent = txt;
-    // 검사
+
     last.innerHTML = '';
     var err = G.validateBet(t);
     row.classList.toggle('invalid', !!err);
     if (err) {
       last.appendChild(h('span', 'err', err));
     } else {
-      var left = t.coins - t.bet.amount - t.bet.saving;
-      last.appendChild(h('span', 'ok', '남는 코인 ' + left));
+      last.appendChild(h('span', 'ok', '남는 코인 ' + (t.coins - b.amount - b.saving)));
     }
   }
 
