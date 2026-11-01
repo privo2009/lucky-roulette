@@ -1,5 +1,5 @@
 /*
- * LUCKY ROULETTE — 도박중독예방교육용 "절대 이길 수 없는 룰렛"
+ * LUCKY ROULETTE — 룰렛 그리기 / 회전 / 효과음
  *
  * 각도 규칙
  *  - 휠 좌표계: 12시 방향이 0°, 시계 방향으로 증가.
@@ -76,7 +76,7 @@
       d: 'M' + CX + ',' + CY + ' L' + p0[0] + ',' + p0[1] +
          ' A' + R_WHEEL + ',' + R_WHEEL + ' 0 0 1 ' + p1[0] + ',' + p1[1] + ' Z'
     }));
-    var tp = polar(140, mid);
+    var tp = polar(152, mid);
     var t = el('text', {
       'class': 'seg-label', x: tp[0], y: tp[1],
       transform: 'rotate(' + mid + ' ' + tp[0] + ' ' + tp[1] + ')'
@@ -142,19 +142,29 @@
   // ---------------- 회전 ----------------
   var rotation = 0;
   var spinning = false;
-  var resultBox = document.getElementById('result');
-  var resultNum = document.getElementById('resultNum');
 
   function setRotation(r) {
-    wheel.setAttribute('transform', 'rotate(' + r + ' ' + CX + ' ' + CY + ')');
+    rotation = r || 0;
+    wheel.setAttribute('transform', 'rotate(' + rotation + ' ' + CX + ' ' + CY + ')');
   }
   function easeOutQuart(t) { return 1 - Math.pow(1 - t, 4); }
 
-  function spinTo(target) {
+  var flashTimer = null;
+  function flash(num) {
+    clearTimeout(flashTimer);
+    segEls.forEach(function (s) { s.classList.remove('win'); });
+    var s = segEls[num - 1];
+    if (!s) return;
+    void s.getBoundingClientRect();
+    s.classList.add('win');
+    flashTimer = setTimeout(function () { s.classList.remove('win'); }, 2100);
+  }
+
+  /** target 숫자에 멈추도록 회전. 끝나면 onDone(멈춘 숫자) 호출 */
+  function spinTo(target, onDone) {
+    if (spinning) return false;
     spinning = true;
     segEls.forEach(function (s) { s.classList.remove('win'); });
-    resultBox.classList.remove('pop');
-    resultNum.textContent = '?';
 
     var plan = planSpin(rotation, target);
     var start = rotation, end = plan.finalRotation, dur = plan.duration;
@@ -165,63 +175,31 @@
       if (t0 === null) t0 = ts;
       var p = Math.min((ts - t0) / dur, 1);
       var r = start + (end - start) * easeOutQuart(p);
-      setRotation(r);
+      wheel.setAttribute('transform', 'rotate(' + r + ' ' + CX + ' ' + CY + ')');
       var seg = Math.floor(mod(-r, 360) / SEG_ANGLE);
       if (seg !== lastSeg) { playTick(); lastSeg = seg; }
       if (p < 1) {
         requestAnimationFrame(frame);
       } else {
-        rotation = end;
-        setRotation(rotation);
-        finish(numberAtPointer(rotation));
+        setRotation(end);
+        var num = numberAtPointer(rotation);
+        flash(num);
+        playWin();
+        spinning = false;
+        if (onDone) onDone(num);
       }
     }
     requestAnimationFrame(frame);
+    return true;
   }
 
-  function finish(num) {
-    resultNum.textContent = String(num);
-    void resultBox.offsetWidth;
-    resultBox.classList.add('pop');
-    var s = segEls[num - 1];
-    void s.offsetWidth;
-    s.classList.add('win');
-    playWin();
-    spinning = false;
-  }
-
-  // ---------------- 키보드 ----------------
-  function digitFromEvent(e) {
-    var m = /^(?:Digit|Numpad)([1-8])$/.exec(e.code || '');
-    if (m) return parseInt(m[1], 10);
-    if (/^[1-8]$/.test(e.key)) return parseInt(e.key, 10);
-    return 0;
-  }
-  function toggleFullscreen() {
-    var d = document;
-    var isFs = d.fullscreenElement || d.webkitFullscreenElement;
-    if (!isFs) {
-      var root = d.documentElement;
-      (root.requestFullscreen || root.webkitRequestFullscreen).call(root);
-    } else {
-      (d.exitFullscreen || d.webkitExitFullscreen).call(d);
-    }
-  }
-
-  document.addEventListener('keydown', function (e) {
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    ensureAudio();
-
-    if (e.code === 'KeyF' || e.key === 'f' || e.key === 'F' || e.key === 'ㄹ') {
-      e.preventDefault();
-      if (!e.repeat) toggleFullscreen();
-      return;
-    }
-
-    var n = digitFromEvent(e);
-    if (!n) return;
-    e.preventDefault();
-    if (e.repeat || spinning) return;
-    spinTo(n);
-  });
+  window.Roulette = {
+    spinTo: spinTo,
+    setRotation: setRotation,
+    getRotation: function () { return rotation; },
+    isSpinning: function () { return spinning; },
+    ensureAudio: ensureAudio,
+    flash: flash,
+    clearFlash: function () { clearTimeout(flashTimer); segEls.forEach(function (s) { s.classList.remove('win'); }); }
+  };
 })();

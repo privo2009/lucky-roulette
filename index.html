@@ -7,61 +7,125 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main class="stage">
-    <h1 class="title">LUCKY ROULETTE</h1>
+  <div class="app">
+    <!-- 왼쪽: 룰렛 -->
+    <section class="left">
+      <h1 class="title">LUCKY ROULETTE</h1>
+      <div class="wheel-wrap">
+        <svg id="roulette" viewBox="0 0 500 500" aria-label="룰렛">
+          <defs>
+            <radialGradient id="rimGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="86%" stop-color="#8a6212"/>
+              <stop offset="92%" stop-color="#f7d774"/>
+              <stop offset="97%" stop-color="#b8861b"/>
+              <stop offset="100%" stop-color="#5c3f07"/>
+            </radialGradient>
+            <radialGradient id="hubGrad" cx="40%" cy="35%" r="70%">
+              <stop offset="0%" stop-color="#fff2b8"/>
+              <stop offset="45%" stop-color="#e2b33c"/>
+              <stop offset="100%" stop-color="#7a5508"/>
+            </radialGradient>
+            <radialGradient id="shade" cx="50%" cy="50%" r="50%">
+              <stop offset="60%" stop-color="#000" stop-opacity="0"/>
+              <stop offset="100%" stop-color="#000" stop-opacity="0.35"/>
+            </radialGradient>
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="2.5" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+            <filter id="pointerShadow" x="-50%" y="-50%" width="200%" height="200%">
+              <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000" flood-opacity="0.7"/>
+            </filter>
+          </defs>
 
-    <div class="wheel-wrap">
-      <svg id="roulette" viewBox="0 0 500 500" aria-label="룰렛">
-        <defs>
-          <radialGradient id="rimGrad" cx="50%" cy="50%" r="50%">
-            <stop offset="86%" stop-color="#8a6212"/>
-            <stop offset="92%" stop-color="#f7d774"/>
-            <stop offset="97%" stop-color="#b8861b"/>
-            <stop offset="100%" stop-color="#5c3f07"/>
-          </radialGradient>
-          <radialGradient id="hubGrad" cx="40%" cy="35%" r="70%">
-            <stop offset="0%" stop-color="#fff2b8"/>
-            <stop offset="45%" stop-color="#e2b33c"/>
-            <stop offset="100%" stop-color="#7a5508"/>
-          </radialGradient>
-          <radialGradient id="shade" cx="50%" cy="50%" r="50%">
-            <stop offset="60%" stop-color="#000" stop-opacity="0"/>
-            <stop offset="100%" stop-color="#000" stop-opacity="0.35"/>
-          </radialGradient>
-          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="2.5" result="b"/>
-            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-          <filter id="pointerShadow" x="-50%" y="-50%" width="200%" height="200%">
-            <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000" flood-opacity="0.7"/>
-          </filter>
-        </defs>
+          <circle cx="250" cy="250" r="244" fill="url(#rimGrad)"/>
+          <circle cx="250" cy="250" r="244" fill="none" stroke="#3d2a04" stroke-width="2"/>
+          <g id="bulbs"></g>
 
-        <!-- 금색 테두리 -->
-        <circle cx="250" cy="250" r="244" fill="url(#rimGrad)"/>
-        <circle cx="250" cy="250" r="244" fill="none" stroke="#3d2a04" stroke-width="2"/>
-        <g id="bulbs"></g>
+          <g id="wheel"><g id="segments"></g></g>
+          <circle cx="250" cy="250" r="212" fill="url(#shade)" pointer-events="none"/>
+          <circle cx="250" cy="250" r="212" fill="none" stroke="#f7d774" stroke-width="3" pointer-events="none"/>
 
-        <!-- 회전하는 휠 -->
-        <g id="wheel">
-          <g id="segments"></g>
-        </g>
-        <circle cx="250" cy="250" r="212" fill="url(#shade)" pointer-events="none"/>
-        <circle cx="250" cy="250" r="212" fill="none" stroke="#f7d774" stroke-width="3" pointer-events="none"/>
+          <circle cx="250" cy="250" r="34" fill="url(#hubGrad)" stroke="#5c3f07" stroke-width="3"/>
+          <circle cx="250" cy="250" r="12" fill="#5c3f07"/>
 
-        <!-- 중앙 허브 -->
-        <circle cx="250" cy="250" r="34" fill="url(#hubGrad)" stroke="#5c3f07" stroke-width="3"/>
-        <circle cx="250" cy="250" r="12" fill="#5c3f07"/>
+          <polygon id="pointer" points="226,4 274,4 250,62" fill="#e01b24"
+                   stroke="#fff" stroke-width="3" stroke-linejoin="round" filter="url(#pointerShadow)"/>
+        </svg>
+      </div>
+      <div class="result" id="result">결과: <span id="resultNum">?</span></div>
+    </section>
 
-        <!-- 고정 포인터 -->
-        <polygon id="pointer" points="226,4 274,4 250,62" fill="#e01b24"
-                 stroke="#fff" stroke-width="3" stroke-linejoin="round" filter="url(#pointerShadow)"/>
-      </svg>
+    <!-- 오른쪽: 모둠 현황판 -->
+    <section class="board">
+      <header class="board-head">
+        <div class="round-badge" id="roundBadge">1 / 10 라운드</div>
+        <div class="phase-label" id="phaseLabel"></div>
+        <div class="fee-box" id="feeBox" hidden>
+          <div class="fee-title">수수료 적용 중 <small>(당첨 시)</small></div>
+          <div class="fee-table" id="feeTable"></div>
+        </div>
+      </header>
+
+      <div class="cols">
+        <div>모둠</div><div>보유 코인</div><div>이번 베팅</div><div>적금</div><div id="lastColLabel">상태</div>
+      </div>
+      <div class="rows" id="rows"></div>
+
+      <footer class="controls">
+        <button type="button" class="btn ghost" id="undoBtn">↶ 이전 단계로</button>
+        <button type="button" class="btn ghost danger" id="resetBtn">게임 초기화</button>
+        <div class="spacer"></div>
+        <div class="hint" id="hint"></div>
+        <button type="button" class="btn primary" id="primaryBtn"></button>
+      </footer>
+    </section>
+  </div>
+
+  <!-- 게임 설정 -->
+  <div class="overlay" id="setup" hidden>
+    <form class="panel setup-panel" id="setupForm" autocomplete="off">
+      <h2>게임 설정</h2>
+      <div class="setup-grid">
+        <label>모둠 수 <input type="number" id="setTeams" min="2" max="10" step="1" required></label>
+        <label>총 라운드 수 <input type="number" id="setRounds" min="1" max="30" step="1" required></label>
+        <label>시작 코인 <input type="number" id="setCoins" min="1" max="1000" step="1" required></label>
+      </div>
+      <h3>모둠 이름</h3>
+      <div class="name-grid" id="nameGrid"></div>
+      <button type="submit" class="btn primary big">게임 시작</button>
+    </form>
+  </div>
+
+  <!-- 게임 종료 -->
+  <div class="overlay" id="end" hidden>
+    <div class="panel end-panel">
+      <h2>최종 결과</h2>
+      <div class="end-grid">
+        <div class="end-col">
+          <h3>최종 순위 <small>(보유 코인 + 돌려받은 적금)</small></h3>
+          <ol class="ranking" id="ranking"></ol>
+        </div>
+        <div class="end-col reveal">
+          <h3>룰렛의 진실</h3>
+          <div class="stat-list" id="statList"></div>
+          <div class="casino">
+            <div class="casino-label">카지노(룰렛)가 가져간 코인</div>
+            <div class="casino-num" id="casinoNum">0</div>
+          </div>
+          <h3>베팅 없이 적금만 했다면?</h3>
+          <div class="saving-compare" id="savingCompare"></div>
+        </div>
+      </div>
+      <div class="end-actions">
+        <button type="button" class="btn ghost" id="endUndoBtn">↶ 이전 단계로</button>
+        <button type="button" class="btn ghost danger" id="endResetBtn">새 게임 (초기화)</button>
+      </div>
     </div>
+  </div>
 
-    <div class="result" id="result">결과: <span id="resultNum">?</span></div>
-  </main>
-
-  <script src="script.js"></script>
+  <script src="game.js"></script>
+  <script src="roulette.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
