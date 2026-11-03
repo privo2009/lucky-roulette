@@ -485,3 +485,28 @@ button, input, select { font-family: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .row.fx-lose { animation: none; }
 }
+
+/* ================= 현재 1위 (왕관) ================= */
+.total { display: block; font-size: calc(1.6vh * var(--s)); color: rgba(255, 246, 201, 0.7); margin-top: 0.3vh; white-space: nowrap; }
+.total b { color: var(--cream); font-weight: 900; }
+.row.leader {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 0.15vh var(--gold), 0 0 1.8vh rgba(247, 215, 116, 0.45);
+}
+.row.leader .total b { color: var(--gold); }
+.crown {
+  position: absolute;
+  left: -0.8vw; top: calc(-2.2vh * var(--s));
+  z-index: 4;
+  font-size: calc(4.6vh * var(--s));
+  line-height: 1;
+  transform: rotate(-18deg);
+  filter: drop-shadow(0 0.3vh 0.3vh rgba(0, 0, 0, 0.7)) drop-shadow(0 0 0.8vh rgba(247, 215, 116, 0.7));
+  pointer-events: none;
+}
+.crown.pop { animation: crownPop 0.45s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes crownPop {
+  0%   { transform: rotate(-18deg) scale(0) translateY(1vh); opacity: 0; }
+  60%  { transform: rotate(-8deg) scale(1.35); opacity: 1; }
+  100% { transform: rotate(-18deg) scale(1); }
+}

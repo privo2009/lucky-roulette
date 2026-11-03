@@ -52,6 +52,7 @@
   }
   function resetGame() {
     cancelAnim();
+    crown.leaders = null;
     var settings = state.settings || G.defaultSettings();
     state = G.initialState(settings);
     state.rotation = W.getRotation();
@@ -106,9 +107,14 @@
     var n = state.teams.length;
     rows.style.setProperty('--s', n <= 6 ? 1 : n <= 8 ? 0.85 : 0.72);
     var pending = !!anim && p === 'result';
+    var leaders = leadersOf(pending ? anim.prev : state);
+    var prevLeaders = crown.leaders;
+    crown.pop = prevLeaders ? leaders.filter(function (i) { return prevLeaders.indexOf(i) < 0; }) : [];
+    crown.leaders = leaders;
     var order = state.teams.map(function (t, i) { return i; });
     if ((p === 'result' || p === 'end') && !pending) order = rankOrder();
     order.forEach(function (i) { rows.appendChild(renderRow(state.teams[i], i, pending)); });
+    crown.pop = [];
 
     var btn = $('primaryBtn');
     btn.hidden = false;
@@ -212,6 +218,19 @@
     if (!on && tag) tag.remove();
   }
 
+  // ---------------- 현재 1위 (왕관) ----------------
+  // 총 자산 = 보유 코인 + 돌려받을 적금 원금. 최종 순위(G.standings)와 같은 G.returnedSavings 사용
+  function totalAssets(t) { return t.coins + G.returnedSavings(t); }
+  var crown = { leaders: null, pop: [] };   // leaders: 마지막으로 그린 1위 모둠 번호들
+  /** 1위(동점이면 모두) 모둠 번호. 1라운드 정산 전에는 [] */
+  function leadersOf(s) {
+    if (!s || !s.teams) return [];
+    if (s.round === 1 && s.phase !== 'result' && s.phase !== 'end') return [];
+    var tot = s.teams.map(totalAssets);
+    var max = Math.max.apply(null, tot);
+    return tot.map(function (v, i) { return v === max ? i : -1; }).filter(function (i) { return i >= 0; });
+  }
+
   /** pending: 정산 연출 전 상태 (이전 코인 표시, 결과 칸 숨김) */
   function renderRow(t, i, pending) {
     var p = state.phase;
@@ -223,9 +242,17 @@
     var shownCoins = pending && t.last ? t.coins - t.last.delta : t.coins;
     var coins = h('div', 'c-coins');
     coins.appendChild(h('span', 'coin-num', String(shownCoins)));
+    var total = h('small', 'total');
+    total.appendChild(document.createTextNode('총 자산 '));
+    total.appendChild(h('b', 'total-num', String(totalAssets(pending ? anim.prev.teams[i] : t))));
+    coins.appendChild(total);
     if (t.broken > 0) coins.appendChild(h('small', 'held', '보관 적금 ' + t.broken));
     row.appendChild(coins);
     setBankrupt(row, shownCoins === 0);
+    if (crown.leaders && crown.leaders.indexOf(i) >= 0) {
+      row.classList.add('leader');
+      row.appendChild(h('span', 'crown' + (crown.pop.indexOf(i) >= 0 ? ' pop' : ''), '👑'));
+    }
 
     var actCell = h('div', 'c-act');
     var saveCell = h('div', 'c-save');
@@ -381,7 +408,7 @@
   var FLOAT_MS = 900;      // 떠오르는 숫자 지속 시간
   var FLIP_MS = 500;       // 재정렬
 
-  var anim = null;         // 연출 중이면 { timers: [] }
+  var anim = null;         // 연출 중이면 { timers: [], prev: 정산 전 상태 }
 
   function later(ms, fn) {
     var a = anim;
@@ -430,6 +457,8 @@
     var before = t.coins - r.delta;
     row.classList.remove('pending');
     rollNumber(row.querySelector('.coin-num'), before, t.coins, ROLL_MS);
+    var tn = row.querySelector('.total-num');
+    rollNumber(tn, Number(tn.textContent), totalAssets(t), ROLL_MS);
 
     if (r.mode === 'bet' && r.win) {
       row.classList.add('winner');
@@ -481,9 +510,9 @@
   }
 
   /** 룰렛 정지 직후 호출: state는 이미 정산된 상태 */
-  function startResultAnim() {
+  function startResultAnim(prev) {
     cancelAnim();
-    anim = { timers: [] };
+    anim = { timers: [], prev: prev };   // prev: 정산 전 상태 (왕관·총 자산은 연출이 끝날 때까지 이 기준)
   }
   function runResultAnim() {
     later(W.FLASH_MS + START_DELAY, function () {
@@ -690,7 +719,7 @@
     W.spinTo(n, function (stopped) {
       var next = G.settle(state, stopped);
       next.rotation = W.getRotation();
-      startResultAnim();
+      startResultAnim(JSON.parse(before));
       commit(next, before);
       runResultAnim();
     });
