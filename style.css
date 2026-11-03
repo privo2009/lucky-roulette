@@ -390,3 +390,98 @@ button, input, select { font-family: inherit; }
 .cmp.ref { grid-column: span 2; background: rgba(247, 215, 116, 0.12); }
 .cmp.ref b { color: var(--gold); }
 .end-actions { display: flex; justify-content: center; gap: 2vw; margin-top: 2vh; }
+
+/* ================= 적금 해지 확인 모달 ================= */
+.modal-overlay { z-index: 20; background: rgba(5, 1, 2, 0.72); animation: fadeIn 0.15s ease-out; }
+.modal-panel {
+  width: min(70vw, 90vh);
+  text-align: center;
+  border-color: var(--bad);
+  box-shadow: 0 0 4vh rgba(255, 90, 95, 0.35);
+  animation: popIn 0.18s cubic-bezier(.2, .9, .3, 1.2);
+}
+.modal-icon { font-size: 7vh; line-height: 1; color: var(--bad); text-shadow: 0 0 2vh rgba(255, 90, 95, 0.6); }
+.modal-msg { font-size: 3.4vh; font-weight: 800; line-height: 1.45; margin: 2vh 0 3vh; word-break: keep-all; }
+.modal-actions { display: flex; justify-content: center; gap: 2vw; }
+.modal-actions .btn { font-size: 2.8vh; padding: 1.2vh 2.6vw; }
+.modal-actions .btn.ghost { opacity: 0.9; }
+.btn.primary.break {
+  color: #fff;
+  background: linear-gradient(180deg, #ff6b70 0%, #d7263d 50%, #8e0f1c 100%);
+  box-shadow: 0 0.5vh 0 #5a0811, 0 0 2vh rgba(255, 90, 95, 0.45);
+}
+.modal-actions .btn:focus-visible { outline: 0.3vh solid #fff; outline-offset: 0.4vh; }
+@keyframes fadeIn { from { opacity: 0; } }
+@keyframes popIn { from { opacity: 0; transform: scale(0.9); } }
+
+/* ================= 정산 결과 연출 ================= */
+.row { position: relative; }
+.row::after {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+}
+.c-save, .c-last { transition: opacity 0.3s; }
+.row.pending .c-save, .row.pending .c-last { opacity: 0; }
+
+.row.fx-win::after    { background: rgba(61, 220, 132, 0.5);  animation: rowFlash 0.7s ease-out; }
+.row.fx-lose::after   { background: rgba(255, 90, 95, 0.45);  animation: rowFlash 0.7s ease-out; }
+.row.fx-mature::after { background: rgba(247, 215, 116, 0.55); animation: rowFlash 0.8s ease-out; }
+.row.fx-soft::after   { background: rgba(255, 246, 201, 0.08); animation: rowFlash 0.6s ease-out; }
+.row.fx-lose { animation: shake 0.4s ease-in-out; }
+.row.fx-mature { box-shadow: 0 0 2.5vh rgba(247, 215, 116, 0.55); }
+@keyframes rowFlash { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-0.6vw); }
+  40% { transform: translateX(0.5vw); }
+  60% { transform: translateX(-0.35vw); }
+  80% { transform: translateX(0.2vw); }
+}
+
+.c-coins { position: relative; }
+.float {
+  position: absolute;
+  left: 50%; top: -25%;
+  z-index: 5;
+  white-space: nowrap;
+  font-size: calc(4.4vh * var(--s));
+  font-weight: 900;
+  pointer-events: none;
+  text-shadow: 0 0 1vh rgba(0, 0, 0, 0.8), 0 0.3vh 0.2vh #000;
+  animation: floatUp 0.9s ease-out forwards;
+}
+.float.up   { color: var(--good); }
+.float.down { color: var(--bad); }
+.float.gold { color: var(--gold); font-size: calc(3.6vh * var(--s)); }
+.float.fee  { color: var(--bad); font-size: calc(3vh * var(--s)); left: 175%; top: -30%; }
+@keyframes floatUp {
+  0%   { opacity: 0; transform: translate(-50%, 0.8vh) scale(0.8); }
+  20%  { opacity: 1; transform: translate(-50%, -1vh) scale(1.08); }
+  70%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -6vh) scale(1); }
+}
+
+.row.bankrupt {
+  background: rgba(110, 110, 115, 0.2);
+  border-color: rgba(160, 160, 165, 0.45);
+}
+.row.bankrupt .c-name, .row.bankrupt .coin-num { color: #9a9a9f; text-shadow: none; }
+.bankrupt-tag {
+  display: inline-block;
+  margin-top: 0.4vh;
+  font-size: calc(1.7vh * var(--s));
+  font-weight: 900;
+  color: #fff;
+  background: #5a5560;
+  border-radius: 0.6vh;
+  padding: 0.1vh 0.5vw;
+}
+.hint.soft { color: rgba(255, 246, 201, 0.6); font-weight: 400; }
+.controls .btn, .hint { white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .row.fx-lose { animation: none; }
+}

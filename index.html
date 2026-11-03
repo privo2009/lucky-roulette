@@ -124,6 +124,18 @@
     </div>
   </div>
 
+  <!-- 적금 해지 확인 -->
+  <div class="overlay modal-overlay" id="breakModal" hidden>
+    <div class="panel modal-panel" role="alertdialog" aria-modal="true" aria-labelledby="breakMsg">
+      <div class="modal-icon">⚠</div>
+      <p class="modal-msg" id="breakMsg"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" id="breakCancel">취소</button>
+        <button type="button" class="btn primary break" id="breakOk">해지하고 계속</button>
+      </div>
+    </div>
+  </div>
+
   <script src="game.js"></script>
   <script src="roulette.js"></script>
   <script src="app.js"></script>

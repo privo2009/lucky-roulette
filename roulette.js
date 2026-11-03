@@ -136,6 +136,33 @@
       osc.stop(t0 + 0.65);
     });
   }
+  /** 정산 연출용 짧은 효과음. notes: [주파수, 시작(초), 길이(초)] 목록 */
+  function blip(type, vol, notes, slideTo) {
+    if (!audioCtx || audioCtx.state !== 'running') return;
+    var now = audioCtx.currentTime;
+    notes.forEach(function (n) {
+      var t0 = now + n[1], d = n[2];
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(n[0], t0);
+      if (slideTo) osc.frequency.exponentialRampToValueAtTime(n[0] * slideTo, t0 + d);
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(t0);
+      osc.stop(t0 + d + 0.02);
+    });
+  }
+  var SFX = {
+    win:    function () { blip('triangle', 0.22, [[987.8, 0, 0.09], [1318.5, 0.07, 0.16]]); },
+    lose:   function () { blip('sawtooth', 0.09, [[260, 0, 0.28]], 0.5); },
+    fee:    function () { blip('square', 0.07, [[1400, 0, 0.05], [900, 0.05, 0.07]]); },
+    mature: function () { blip('sine', 0.25, [[784, 0, 0.1], [1046.5, 0.08, 0.1], [1568, 0.16, 0.25]]); }
+  };
+  function sfx(kind) { if (SFX[kind]) SFX[kind](); }
+
   // 페이지를 한 번 클릭해 두면 오디오가 활성화됨
   document.addEventListener('pointerdown', ensureAudio);
 
@@ -150,6 +177,7 @@
   function easeOutQuart(t) { return 1 - Math.pow(1 - t, 4); }
 
   var flashTimer = null;
+  var FLASH_MS = 1920;   // style.css의 winFlash (0.32s × 6회)
   function flash(num) {
     clearTimeout(flashTimer);
     segEls.forEach(function (s) { s.classList.remove('win'); });
@@ -199,6 +227,8 @@
     getRotation: function () { return rotation; },
     isSpinning: function () { return spinning; },
     ensureAudio: ensureAudio,
+    sfx: sfx,
+    FLASH_MS: FLASH_MS,
     flash: flash,
     clearFlash: function () { clearTimeout(flashTimer); segEls.forEach(function (s) { s.classList.remove('win'); }); }
   };

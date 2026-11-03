@@ -35,6 +35,7 @@
     } catch (e) { /* 저장 실패 시에도 진행은 계속 */ }
   }
   function commit(newState, prevJSON) {
+    if (anim && newState.phase !== 'result') cancelAnim();
     history.push(prevJSON || JSON.stringify(state));
     if (history.length > MAX_HISTORY) history.shift();
     state = newState;
@@ -43,12 +44,14 @@
   }
   function undo() {
     if (W.isSpinning() || !history.length) return;
+    cancelAnim();
     state = G.normalizeState(JSON.parse(history.pop()));
     save();
     W.setRotation(state.rotation || 0);
     render();
   }
   function resetGame() {
+    cancelAnim();
     var settings = state.settings || G.defaultSettings();
     state = G.initialState(settings);
     state.rotation = W.getRotation();
@@ -102,12 +105,16 @@
     rows.innerHTML = '';
     var n = state.teams.length;
     rows.style.setProperty('--s', n <= 6 ? 1 : n <= 8 ? 0.85 : 0.72);
-    state.teams.forEach(function (t, i) { rows.appendChild(renderRow(t, i)); });
+    var pending = !!anim && p === 'result';
+    var order = state.teams.map(function (t, i) { return i; });
+    if ((p === 'result' || p === 'end') && !pending) order = rankOrder();
+    order.forEach(function (i) { rows.appendChild(renderRow(state.teams[i], i, pending)); });
 
     var btn = $('primaryBtn');
     btn.hidden = false;
-    btn.disabled = false;
-    $('hint').textContent = '';
+    btn.disabled = pending;
+    $('hint').textContent = pending ? 'Space·Enter 건너뛰기' : '';
+    $('hint').classList.toggle('soft', pending);
     if (p === 'bet') {
       btn.textContent = '베팅 마감';
       updateBetValidity();
@@ -140,7 +147,41 @@
   }
 
   var MODE_LABEL = { bet: '베팅', save: '적금', rest: '쉬기' };
-  var BREAK_MSG = '베팅하면 적금이 해지되고 보너스를 받을 수 없어요. 계속할까요?';
+
+  // ---------------- 적금 해지 확인 모달 ----------------
+  var modalCb = null;
+  function modalOpen() { return !$('breakModal').hidden; }
+  function askBreak(team, onOk, onCancel) {
+    $('breakMsg').textContent = team.name + '의 적금이 해지되고 보너스를 받을 수 없어요. 계속할까요?';
+    modalCb = { ok: onOk, cancel: onCancel };
+    $('breakModal').hidden = false;
+    $('breakCancel').focus();
+  }
+  function closeModal(ok) {
+    var cb = modalCb;
+    modalCb = null;
+    $('breakModal').hidden = true;
+    var fn = cb && (ok ? cb.ok : cb.cancel);
+    if (fn) fn();
+  }
+  $('breakOk').addEventListener('click', function () { closeModal(true); });
+  $('breakCancel').addEventListener('click', function () { closeModal(false); });
+  $('breakModal').addEventListener('pointerdown', function (e) { if (e.target === this) closeModal(false); });
+
+  /** 이 선택이 진행 중인 적금을 깨는지 (금액 미선택 상태는 아직 해지로 보지 않음) */
+  function breaksPlan(plan, bet) {
+    if (!plan) return false;
+    if (bet.mode === 'save' && !bet.saving) return false;
+    return G.savingWillBreak({ plan: plan, bet: bet });
+  }
+  /** 적금이 새로 깨지는 변경이면 모달로 확인 후 apply, 취소하면 revert */
+  function guardBreak(t, nextBet, apply, revert) {
+    if (!breaksPlan(t.plan, t.bet) && breaksPlan(t.plan, nextBet)) {
+      askBreak(t, apply, revert);
+    } else {
+      apply();
+    }
+  }
 
   /** 진행/결과 화면용 "이번 라운드" 표시 */
   function actionView(t, cell) {
@@ -157,17 +198,34 @@
     }
   }
 
-  function renderRow(t, i) {
+  /** 정산 화면 표시 순서: 보유 코인 많은 순 (같으면 원래 순서) */
+  function rankOrder() {
+    return state.teams.map(function (t, i) { return i; }).sort(function (a, b) {
+      return (state.teams[b].coins - state.teams[a].coins) || (a - b);
+    });
+  }
+
+  function setBankrupt(row, on) {
+    row.classList.toggle('bankrupt', on);
+    var tag = row.querySelector('.bankrupt-tag');
+    if (on && !tag) row.querySelector('.c-coins').appendChild(h('span', 'bankrupt-tag', '파산'));
+    if (!on && tag) tag.remove();
+  }
+
+  /** pending: 정산 연출 전 상태 (이전 코인 표시, 결과 칸 숨김) */
+  function renderRow(t, i, pending) {
     var p = state.phase;
-    var row = h('div', 'row');
+    var row = h('div', 'row' + (pending ? ' pending' : ''));
     row.dataset.idx = i;
 
     row.appendChild(h('div', 'c-name', t.name));
 
+    var shownCoins = pending && t.last ? t.coins - t.last.delta : t.coins;
     var coins = h('div', 'c-coins');
-    coins.appendChild(h('span', 'coin-num', String(t.coins)));
+    coins.appendChild(h('span', 'coin-num', String(shownCoins)));
     if (t.broken > 0) coins.appendChild(h('small', 'held', '보관 적금 ' + t.broken));
     row.appendChild(coins);
+    setBankrupt(row, shownCoins === 0);
 
     var actCell = h('div', 'c-act');
     var saveCell = h('div', 'c-save');
@@ -203,7 +261,7 @@
           note.push('적금 납입 −' + t.last.saving);
         }
         note.forEach(function (x) { lastCell.appendChild(h('small', 'delta-note', x)); });
-        if (t.last.win) row.classList.add('winner');
+        if (t.last.win && !pending) row.classList.add('winner');
       }
     }
 
@@ -222,14 +280,16 @@
       btn.addEventListener('click', function () {
         btn.blur();
         if (t.bet.mode === m) return;
-        if (m === 'bet' && t.plan && !window.confirm(BREAK_MSG)) return;
-        G.setMode(t, m);
-        var fresh = renderRow(t, Number(row.dataset.idx));
-        row.replaceWith(fresh);
-        save();
-        updateBetValidity();
-        var first = fresh.querySelector('.mode-inputs select, .mode-inputs input');
-        if (first && m === 'bet') first.focus();
+        var next = { mode: m, num: 0, amount: 0, saving: m === 'save' && t.plan ? t.plan.amount : 0 };
+        guardBreak(t, next, function () {
+          G.setMode(t, m);
+          var fresh = renderRow(t, Number(row.dataset.idx));
+          row.replaceWith(fresh);
+          save();
+          updateBetValidity();
+          var first = fresh.querySelector('.mode-inputs select, .mode-inputs input');
+          if (first && m === 'bet') first.focus();
+        });
       });
       tabs.appendChild(btn);
     });
@@ -258,7 +318,16 @@
       sav.appendChild(new Option('금액', '0'));
       G.SAVING_OPTIONS.forEach(function (a) { sav.appendChild(new Option(a + '코인', String(a))); });
       sav.value = String(t.bet.saving || 0);
-      sav.addEventListener('change', function () { t.bet.saving = parseInt(sav.value, 10) || 0; onBetEdit(row, t); });
+      sav.addEventListener('change', function () {
+        var v = parseInt(sav.value, 10) || 0;
+        var prev = t.bet.saving;
+        guardBreak(t, { mode: 'save', num: 0, amount: 0, saving: v }, function () {
+          t.bet.saving = v;
+          onBetEdit(row, t);
+        }, function () {
+          sav.value = String(prev || 0);
+        });
+      });
       box.appendChild(sav);
     } else {
       box.appendChild(h('span', 'muted', '이번 라운드 쉬기'));
@@ -302,6 +371,140 @@
     var ok = G.allValid(state);
     $('primaryBtn').disabled = !ok;
     $('hint').textContent = ok ? '' : '빨간 칸을 확인하세요';
+  }
+
+  // ---------------- 정산 결과 연출 ----------------
+  var START_DELAY = 500;   // 당첨 칸 깜빡임이 끝난 뒤 대기
+  var STEP = 350;          // 모둠 간 간격
+  var ROLL_MS = 600;       // 코인 숫자 롤링
+  var FEE_DELAY = 380;     // 당첨 숫자 뒤 수수료 숫자
+  var FLOAT_MS = 900;      // 떠오르는 숫자 지속 시간
+  var FLIP_MS = 500;       // 재정렬
+
+  var anim = null;         // 연출 중이면 { timers: [] }
+
+  function later(ms, fn) {
+    var a = anim;
+    a.timers.push(setTimeout(function () { if (anim === a) fn(); }, ms));
+  }
+  function cancelAnim() {
+    if (!anim) return;
+    anim.timers.forEach(clearTimeout);
+    anim = null;
+  }
+  function skipAnim() {
+    cancelAnim();
+    render();
+  }
+
+  function rollNumber(el, from, to, ms) {
+    var a = anim, t0 = null;
+    if (from === to) { el.textContent = String(to); return; }
+    function step(ts) {
+      if (anim !== a) return;
+      if (t0 === null) t0 = ts;
+      var k = Math.min((ts - t0) / ms, 1);
+      var e = 1 - Math.pow(1 - k, 3);
+      el.textContent = String(Math.round(from + (to - from) * e));
+      if (k < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function floatText(row, text, kind) {
+    var f = h('span', 'float ' + kind, text);
+    f.style.animationDuration = FLOAT_MS + 'ms';
+    row.querySelector('.c-coins').appendChild(f);
+    f.addEventListener('animationend', function () { f.remove(); });
+  }
+
+  function fx(row, cls) {
+    row.classList.remove(cls);
+    void row.offsetWidth;
+    row.classList.add(cls);
+  }
+
+  /** 한 모둠 결과 공개 (걸리는 시간은 revealDuration) */
+  function revealRow(row, t) {
+    var r = t.last;
+    var before = t.coins - r.delta;
+    row.classList.remove('pending');
+    rollNumber(row.querySelector('.coin-num'), before, t.coins, ROLL_MS);
+
+    if (r.mode === 'bet' && r.win) {
+      row.classList.add('winner');
+      fx(row, 'fx-win');
+      floatText(row, '+' + r.gross, 'up');
+      W.sfx('win');
+      if (r.fee) {
+        later(FEE_DELAY, function () { floatText(row, '−' + r.fee + ' 수수료', 'fee'); W.sfx('fee'); });
+      }
+    } else if (r.mode === 'bet') {
+      fx(row, 'fx-lose');
+      floatText(row, '−' + r.bet, 'down');
+      W.sfx('lose');
+    } else if (r.matured) {
+      fx(row, 'fx-mature');
+      floatText(row, '💰 만기 +' + r.matured, 'gold');
+      W.sfx('mature');
+    } else {
+      fx(row, 'fx-soft');
+    }
+    later(ROLL_MS, function () { setBankrupt(row, t.coins === 0); });
+  }
+
+  /** FLIP: 현재 위치 기록 → 새 순서로 DOM 재배치 → 이전 위치에서 새 위치로 이동 */
+  function flipReorder(done) {
+    var rows = $('rows');
+    var els = Array.prototype.slice.call(rows.children);
+    var first = els.map(function (el) { return el.getBoundingClientRect().top; });
+    els.forEach(function (el) { el.classList.remove('fx-win', 'fx-lose', 'fx-mature', 'fx-soft'); });
+    var byIdx = {};
+    els.forEach(function (el) { byIdx[el.dataset.idx] = el; });
+    rankOrder().forEach(function (i) { rows.appendChild(byIdx[i]); });
+    var moved = false;
+    els.forEach(function (el, k) {
+      var dy = first[k] - el.getBoundingClientRect().top;
+      if (Math.abs(dy) < 1) return;
+      moved = true;
+      el.style.transition = 'none';
+      el.style.transform = 'translateY(' + dy + 'px)';
+    });
+    if (!moved) { done(); return; }
+    void rows.offsetWidth;
+    els.forEach(function (el) {
+      if (!el.style.transform) return;
+      el.style.transition = 'transform ' + FLIP_MS + 'ms cubic-bezier(.2,.8,.2,1)';
+      el.style.transform = '';
+    });
+    later(FLIP_MS + 30, done);
+  }
+
+  /** 룰렛 정지 직후 호출: state는 이미 정산된 상태 */
+  function startResultAnim() {
+    cancelAnim();
+    anim = { timers: [] };
+  }
+  function runResultAnim() {
+    later(W.FLASH_MS + START_DELAY, function () {
+      var rowEls = Array.prototype.slice.call($('rows').children);
+      var end = 0;
+      rowEls.forEach(function (row, k) {
+        var t = state.teams[Number(row.dataset.idx)];
+        var at = k * STEP;
+        later(at, function () { revealRow(row, t); });
+        end = Math.max(end, at + revealDuration(t));
+      });
+      later(end, function () {
+        flipReorder(function () { anim = null; render(); });
+      });
+    });
+  }
+  function revealDuration(t) {
+    var r = t.last;
+    if (r.mode === 'bet' && r.win && r.fee) return FEE_DELAY + FLOAT_MS;
+    if (r.mode === 'bet' || r.matured) return FLOAT_MS;
+    return ROLL_MS;
   }
 
   // ---------------- 설정 화면 ----------------
@@ -455,6 +658,19 @@
   document.addEventListener('keydown', function (e) {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     W.ensureAudio();
+    if (modalOpen()) {
+      if (e.key === 'Escape') { e.preventDefault(); closeModal(false); }
+      else if (e.key === 'Tab') {
+        e.preventDefault();
+        ($('breakOk') === document.activeElement ? $('breakCancel') : $('breakOk')).focus();
+      }
+      return;   // Enter/Space는 포커스된 버튼이 처리
+    }
+    if (anim && (e.code === 'Space' || e.key === ' ' || e.key === 'Enter')) {
+      e.preventDefault();
+      skipAnim();
+      return;
+    }
     if (isTyping(e.target)) return;   // 입력칸에 타이핑 중이면 단축키 전부 무시
 
     if (e.code === 'KeyF' || e.key === 'f' || e.key === 'F' || e.key === 'ㄹ') {
@@ -474,7 +690,9 @@
     W.spinTo(n, function (stopped) {
       var next = G.settle(state, stopped);
       next.rotation = W.getRotation();
+      startResultAnim();
       commit(next, before);
+      runResultAnim();
     });
   });
 
