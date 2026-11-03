@@ -70,7 +70,7 @@ button, input, select { font-family: inherit; }
 .seg-label {
   font-family: "Arial Black", "Helvetica Neue", Arial, sans-serif;
   font-weight: 900;
-  font-size: 46px;
+  font-size: 48px;
   fill: #fff;
   stroke: rgba(0, 0, 0, 0.55);
   stroke-width: 2.5px;
