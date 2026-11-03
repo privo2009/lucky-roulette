@@ -96,9 +96,7 @@
     }[p] || '';
     $('phaseLabel').className = 'phase-label ' + p;
 
-    var feeOn = G.feeApplies(state.round);
-    $('feeBox').hidden = !feeOn;
-    if (feeOn) renderFeeTable();
+    $('feeBox').hidden = !G.feeApplies(state.round);
 
     $('lastColLabel').textContent = p === 'bet' ? '확인' : p === 'spin' ? '' : '증감';
 
@@ -132,20 +130,6 @@
       btn.hidden = true;
     }
     $('undoBtn').disabled = history.length === 0;
-  }
-
-  function renderFeeTable() {
-    var box = $('feeTable');
-    box.innerHTML = '';
-    var lo = 1;
-    G.FEE_TABLE.forEach(function (row) {
-      var range = row[0] === Infinity ? lo + '~' : lo + '~' + row[0];
-      var chip = h('span', 'fee-chip');
-      chip.appendChild(h('span', null, range));
-      chip.appendChild(h('b', null, String(row[1])));
-      box.appendChild(chip);
-      lo = row[0] + 1;
-    });
   }
 
   function planText(plan) {
@@ -326,7 +310,7 @@
     if (t.bet.mode === 'bet') {
       var num = h('select', 'in-num');
       num.appendChild(new Option('번호', '0'));
-      for (var k = 1; k <= 8; k++) num.appendChild(new Option(k + '번', String(k)));
+      for (var k = 1; k <= G.NUMBERS; k++) num.appendChild(new Option(k + '번', String(k)));
       num.value = String(t.bet.num || 0);
       var amt = h('input', 'in-amt');
       amt.type = 'number'; amt.min = '1'; amt.step = '1'; amt.inputMode = 'numeric';
@@ -664,9 +648,9 @@
 
   // ---------------- 키보드 ----------------
   function digitFromEvent(e) {
-    var m = /^(?:Digit|Numpad)([1-8])$/.exec(e.code || '');
+    var m = /^(?:Digit|Numpad)([1-6])$/.exec(e.code || '');
     if (m) return parseInt(m[1], 10);
-    if (/^[1-8]$/.test(e.key)) return parseInt(e.key, 10);
+    if (/^[1-6]$/.test(e.key)) return parseInt(e.key, 10);
     return 0;
   }
   function isTyping(t) {
@@ -708,7 +692,7 @@
       return;
     }
 
-    // 룰렛 키(1~8)는 ② 룰렛 단계에서만 동작
+    // 룰렛 키(1~6)는 ② 룰렛 단계에서만 동작
     if (state.phase !== 'spin') return;
     var n = digitFromEvent(e);
     if (!n) return;

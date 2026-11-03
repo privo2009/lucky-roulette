@@ -5,19 +5,20 @@
 (function (root) {
   'use strict';
 
+  var NUMBERS = 6;            // 룰렛 숫자 1~6
+  var PAYOUT = 5;             // 당첨 시 베팅금의 5배 지급 (원금 포함)
+  var FEE_RATE = 0.2;         // 수수료: 당첨금의 20%
   var FEE_START_ROUND = 3;
   var SAVING_ROUNDS = 3;
-  // [베팅금 상한, 수수료]
-  var FEE_TABLE = [[5, 1], [10, 2], [15, 4], [20, 5], [25, 7], [30, 8], [Infinity, 10]];
   var SAVING_BONUS = { 3: 5, 4: 6, 5: 8, 6: 10 };
   var SAVING_OPTIONS = [3, 4, 5, 6];
 
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
-  function fee(bet) {
-    if (!bet || bet <= 0) return 0;
-    for (var i = 0; i < FEE_TABLE.length; i++) if (bet <= FEE_TABLE[i][0]) return FEE_TABLE[i][1];
-    return 0;
+  /** 수수료 = 당첨금의 20% (당첨금이 베팅금×5라 항상 베팅금과 같은 정수) */
+  function fee(gross) {
+    if (!gross || gross <= 0) return 0;
+    return Math.round(gross * FEE_RATE);
   }
   function feeApplies(round) { return round >= FEE_START_ROUND; }
 
@@ -93,7 +94,7 @@
     if (b.mode === 'rest') return '';
     if (b.mode === 'bet') {
       if (b.saving) return '베팅/적금 중 하나만';
-      if (!(b.num >= 1 && b.num <= 8)) return '번호 선택';
+      if (!(b.num >= 1 && b.num <= NUMBERS)) return '번호 선택';
       if (!isInt(b.amount) || b.amount <= 0) return '금액 입력';
       if (b.amount > team.coins) return '코인 부족';
       return '';
@@ -124,7 +125,7 @@
     return s;
   }
 
-  /** 룰렛 결과(1~8)로 라운드 정산 */
+  /** 룰렛 결과(1~6)로 라운드 정산 */
   function settle(state, result) {
     var s = clone(state);
     var applyFee = feeApplies(s.round);
@@ -144,8 +145,8 @@
         s.stats.betCount++;
         if (t.bet.num === result) {
           r.win = true;
-          r.gross = bet * 2;
-          r.fee = applyFee ? fee(bet) : 0;
+          r.gross = bet * PAYOUT;
+          r.fee = applyFee ? fee(r.gross) : 0;
           t.coins += r.gross - r.fee;
           s.stats.grossPayout += r.gross;
           s.stats.fees += r.fee;
@@ -244,7 +245,8 @@
   }
 
   var api = {
-    FEE_START_ROUND: FEE_START_ROUND, FEE_TABLE: FEE_TABLE, SAVING_BONUS: SAVING_BONUS,
+    NUMBERS: NUMBERS, PAYOUT: PAYOUT, FEE_RATE: FEE_RATE,
+    FEE_START_ROUND: FEE_START_ROUND, SAVING_BONUS: SAVING_BONUS,
     SAVING_OPTIONS: SAVING_OPTIONS, SAVING_ROUNDS: SAVING_ROUNDS,
     fee: fee, feeApplies: feeApplies, defaultSettings: defaultSettings, defaultName: defaultName,
     MODES: MODES, emptyBet: emptyBet, cleanBet: cleanBet, setMode: setMode, normalizeState: normalizeState,

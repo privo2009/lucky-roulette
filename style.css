@@ -70,7 +70,7 @@ button, input, select { font-family: inherit; }
 .seg-label {
   font-family: "Arial Black", "Helvetica Neue", Arial, sans-serif;
   font-weight: 900;
-  font-size: 48px;
+  font-size: 60px;
   fill: #fff;
   stroke: rgba(0, 0, 0, 0.55);
   stroke-width: 2.5px;
@@ -137,15 +137,8 @@ button, input, select { font-family: inherit; }
   padding: 0.5vh 0.7vw;
   background: rgba(179, 18, 31, 0.25);
 }
-.fee-title { font-size: 1.9vh; font-weight: 900; color: #ffb3b5; }
+.fee-title { font-size: 2.4vh; font-weight: 900; color: #ffb3b5; white-space: nowrap; }
 .fee-title small { font-weight: 400; }
-.fee-table { display: flex; gap: 0.3vw; margin-top: 0.3vh; }
-.fee-chip {
-  display: flex; flex-direction: column; align-items: center;
-  font-size: 1.45vh; line-height: 1.2;
-  background: rgba(0, 0, 0, 0.35); border-radius: 0.6vh; padding: 0.2vh 0.35vw;
-}
-.fee-chip b { font-size: 2vh; color: #fff; }
 
 .cols, .row {
   display: grid;
@@ -375,15 +368,20 @@ button, input, select { font-family: inherit; }
 .stat { display: flex; justify-content: space-between; font-size: 2.8vh; border-bottom: 0.15vh dashed rgba(247, 215, 116, 0.3); padding: 0.4vh 0; }
 .stat b { color: #fff; font-size: 3.2vh; }
 .casino {
-  margin: 2vh 0 0.5vh;
+  margin: 1.2vh 0 0.8vh;
   text-align: center;
   background: rgba(179, 18, 31, 0.35);
   border: 0.35vh solid var(--bad);
   border-radius: 1.6vh;
-  padding: 1.2vh 1vw;
+  padding: 0.8vh 1vw;
 }
 .casino-label { font-size: 2.8vh; font-weight: 800; }
-.casino-num { font-size: 9vh; font-weight: 900; color: #fff; text-shadow: 0 0 2vh var(--bad); line-height: 1.1; }
+.casino-num { font-size: 7vh; font-weight: 900; color: #fff; text-shadow: 0 0 2vh var(--bad); line-height: 1.1; }
+.odds-note {
+  font-size: 1.9vh; line-height: 1.45; text-align: center; word-break: keep-all;
+  background: rgba(0, 0, 0, 0.3); border-radius: 1vh; padding: 0.6vh 0.8vw;
+}
+.odds-note b { color: #fff; }
 .saving-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6vh 1.5vw; }
 .cmp { display: flex; justify-content: space-between; font-size: 2.4vh; background: rgba(61, 220, 132, 0.12); border-radius: 0.8vh; padding: 0.6vh 0.8vw; }
 .cmp b { color: var(--good); }
